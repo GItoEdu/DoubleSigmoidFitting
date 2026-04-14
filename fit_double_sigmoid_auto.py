@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -6,6 +7,10 @@ from pathlib import Path
 import japanize_matplotlib
 plt.rcParams['font.family'] = "Gen Jyuu Gothic LP"
 
+def exit_with_pause():
+    input("\nEnterキーを押して終了してください...")
+    sys.exit()
+
 # 数理モデルの定義
 def double_sigmoid_additive(x, C, m0, L1, dm1, k1, x01, L2, dm2, k2, x02):
     base = m0 * x + C
@@ -13,8 +18,13 @@ def double_sigmoid_additive(x, C, m0, L1, dm1, k1, x01, L2, dm2, k2, x02):
     comp2 = (L2 + dm2 * (x - x02)) / (1 + np.exp(-k2 * (x - x02)))
     return base + comp1 + comp2
 
-# データの読み込み
-csv_file_path = 'H:\\pH5_2.csv'
+# 入力ファイルパスを取得
+if len(sys.argv) > 1:
+    csv_file_path = sys.argv[1]
+else:
+    print("エラー：対象のCSVファイルをドラッグ＆ドロップしてください。")
+    exit_with_pause()
+
 input_path = Path(csv_file_path)
 
 # データ出力先
@@ -25,7 +35,7 @@ try:
     df = pd.read_csv(csv_file_path)
 except FileNotFoundError:
     print(f"エラー: '{csv_file_path}' が見つかりません。")
-    exit()
+    exit_with_pause()
 
 col_x = df.columns[0]
 col_y = df.columns[1]
@@ -40,7 +50,7 @@ y_data = df.iloc[:, 1].values
 n = len(x_data)
 if n < 10:
     print("エラー: データ数が少なすぎます。")
-    exit()
+    exit_with_pause()
 
 m_start, C_start = np.polyfit(x_data[:int(n*0.1)], y_data[:int(n*0.1)], 1)
 total_amplitude = np.mean(y_data[-int(n*0.1):]) - np.mean(y_data[:int(n*0.1)])
@@ -67,17 +77,17 @@ try:
         maxfev=10000
     )
 except RuntimeError as e:
-    print(f"最適化に失敗しました。\n詳細: {e}")
-    exit()
+    print(f"最適化に失敗しました。\n詳細：{e}")
+    exit_with_pause()
 
 # 結果の出力とテキストファイル保存
 C_opt, m0_opt, L1_opt, dm1_opt, k1_opt, x01_opt, L2_opt, dm2_opt, k2_opt, x02_opt = popt
 
 result_text = (
     "最適化されたパラメータ (Auto):\n"
-    f"ベースライン: Y切片 C = {C_opt:.2f}, 初期傾き m0 = {m0_opt:.4f}\n"
-    f"プロセス1   : 振幅 L1 = {L1_opt:.2f}, 傾き変化量 dm1 = {dm1_opt:.4f}, 急峻さ k1 = {k1_opt:.4f}, 変曲点 x01 = {x01_opt:.2f}\n"
-    f"プロセス2   : 振幅 L2 = {L2_opt:.2f}, 傾き変化量 dm2 = {dm2_opt:.4f}, 急峻さ k2 = {k2_opt:.4f}, 変曲点 x02 = {x02_opt:.2f}\n"
+    f"ベースライン： Y切片 C = {C_opt:.2f}, 初期傾き m0 = {m0_opt:.4f}\n"
+    f"プロセス１　： 振幅 L1 = {L1_opt:.2f}, 傾き変化量 dm1 = {dm1_opt:.4f}, 急峻さ k1 = {k1_opt:.4f}, 変曲点 x01 = {x01_opt:.2f}\n"
+    f"プロセス２　： 振幅 L2 = {L2_opt:.2f}, 傾き変化量 dm2 = {dm2_opt:.4f}, 急峻さ k2 = {k2_opt:.4f}, 変曲点 x02 = {x02_opt:.2f}\n"
 )
 print(result_text)
 
@@ -85,7 +95,7 @@ print(result_text)
 txt_filename = f"{base_name}_fit_results_auto.txt"
 txt_output_path = output_dir / txt_filename
 
-with open(txt_output_path, 'w', encoding='utf-8') as f:
+with open(txt_output_path, 'w', encoding='utf-8-sig') as f:
     f.write(result_text)
 print(f"※ パラメータを '{txt_output_path}' に保存しました。")
 
@@ -107,7 +117,6 @@ plt.axvline(x=x02_opt, color='limegreen', linestyle=':', alpha=0.6)
 plt.xlabel(col_x)
 plt.ylabel(col_y)
 plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-plt.title('Fitting Double Sigmoid (Auto Guess)')
 plt.grid(True)
 plt.tight_layout()
 
@@ -115,4 +124,5 @@ png_filename = f"{base_name}_fitted_curve_auto.png"
 png_output_path = output_dir / png_filename
 plt.savefig(png_output_path, dpi=300, bbox_inches='tight')
 print(f"※ プロット画像を '{png_output_path}' に保存しました。")
-plt.show()
+print("\n全ての処理が完了しました。")
+exit_with_pause()
