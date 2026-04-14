@@ -115,7 +115,7 @@ print(f"※ パラメータを '{txt_output_path}' に保存しました。")
 # 5. 結果のプロットと画像ファイル保存
 plt.figure(figsize=(10, 7))
 plt.scatter(x_data, y_data, label='Observed Data', color='gray', alpha=0.5, s=15)
-plt.plot(x_data, single_sigmoid_additive(x_data, *popt), label='Fitted Model', color='red', linewidth=2)
+plt.plot(x_data, single_sigmoid_additive(x_data, *popt), label='Fitted Model ($R^2={r_squared:.4f}$)', color='red', linewidth=2)
 
 base = m0_opt * x_data + C_opt
 comp = (L_opt + dm_opt * (x_data - x0_opt)) / (1 + np.exp(-k_opt * (x_data - x0_opt)))
