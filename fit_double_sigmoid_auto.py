@@ -82,7 +82,7 @@ print(result_text)
 txt_filename = f"{base_name}_fit_results_auto.txt"
 txt_output_path = output_dir / txt_filename
 
-with open('fit_results_auto.txt', 'w', encoding='utf-8') as f:
+with open(txt_output_path, 'w', encoding='utf-8') as f:
     f.write(result_text)
 print(f"※ パラメータを '{txt_output_path}' に保存しました。")
 
