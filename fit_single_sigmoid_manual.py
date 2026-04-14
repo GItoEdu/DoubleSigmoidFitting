@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 from pathlib import Path
+import re
 
 def exit_with_pause():
     input("\nEnterキーを押して終了してください...")
@@ -25,6 +26,11 @@ else:
 input_path = Path(csv_file_path)
 output_dir = input_path.parent
 base_name = input_path.stem
+param_file_path = output_dir / "success_params.txt"
+
+if not param_file_path.exists():
+    print(f"エラー：初期値ファイル '{param_file_path.name}' が見つかりません。")
+    exit_with_pause()
 
 if input_path.suffix.lower() != '.csv':
     print(f"エラー：ドロップされたファイル '{input_path.name}' はCSVではありません。")
@@ -53,18 +59,29 @@ if n < 10:
     print("エラー：データ数が少なすぎます。")
     exit_with_pause()
 
-# 初期と最終の20%のデータからベースラインを推論
-m_start, C_start = np.polyfit(x_data[:int(n*0.2)], y_data[:int(n*0.2)], 1)
-m_end, C_end     = np.polyfit(x_data[-int(n*0.2):], y_data[-int(n*0.2):], 1)
+# パラメータファイルから初期値を読み込み
+print(f"初期値を {param_file_path.name} から読み込んでいます...")
+try:
+    with open(param_file_path, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+    
+    all_values = []
+    for line in lines:
+        # 各行から数値（整数・浮動小数点数）を抽出
+        matches = re.findall(r"[-+]?\d*\.\d+|\d+", line)
+        all_values.extend([float(v) for v in matches])
 
-total_amplitude = np.mean(y_data[-int(n*0.2):]) - np.mean(y_data[:int(n*0.2)])
-guess_x0 = np.percentile(x_data, 50)
-guess_dm = m_end - m_start
-
-initial_guess = [
-    C_start, m_start,
-    total_amplitude, guess_dm, 0.2, guess_x0
-]
+    # 抽出された数値リストから必要なものを特定
+    # インデックス 0: 決定係数 (スキップ)
+    # インデックス 1: C, 2: m0, 3: L, 4: dm, 5: k, 6: x0
+    if len(all_values) < 7:
+        raise ValueError(f"数値が足りません（抽出数: {len(all_values)}）。ファイル形式を確認してください。")
+    
+    initial_guess = all_values[1:7]
+    print(f"読み込まれた初期値: {initial_guess}")
+except Exception as e:
+    print(f"エラー：パラメータファイルの解析に失敗しました。\n詳細：{e}")
+    exit_with_pause()
 
 x_min, x_max = np.min(x_data), np.max(x_data)
 # Bounds: L >= 0, k > 0, x0 はデータ範囲内

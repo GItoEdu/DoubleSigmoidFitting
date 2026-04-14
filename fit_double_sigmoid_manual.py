@@ -155,7 +155,7 @@ plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
 plt.grid(True)
 plt.tight_layout()
 
-png_filename = f"{base_name}_fitted_curve_auto.png"
+png_filename = f"{base_name}_fitted_curve_double_manual.png"
 png_output_path = output_dir / png_filename
 plt.savefig(png_output_path, dpi=300, bbox_inches='tight')
 print(f"※ プロット画像を '{png_output_path}' に保存しました。")
