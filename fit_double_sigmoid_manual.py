@@ -1,46 +1,94 @@
+import sys
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import re
 from scipy.optimize import curve_fit
+from pathlib import Path
+import japanize_matplotlib
+plt.rcParams['font.family'] = "Gen Jyuu Gothic LP"
 
-# 1. 数理モデルの定義
+def exit_with_pause():
+    input("\nEnterキーを押して終了してください...")
+    sys.exit()
+
+# 数理モデルの定義
 def double_sigmoid_additive(x, C, m0, L1, dm1, k1, x01, L2, dm2, k2, x02):
     base = m0 * x + C
     comp1 = (L1 + dm1 * (x - x01)) / (1 + np.exp(-k1 * (x - x01)))
     comp2 = (L2 + dm2 * (x - x02)) / (1 + np.exp(-k2 * (x - x02)))
     return base + comp1 + comp2
 
-# 2. データの読み込み
-csv_file_path = 'data.csv'
-x_column_name = 'X'
-y_column_name = 'Y'
+# パラメータファイルから数値を抽出する関数
+def load_param_from_txt(file_path):
+    with open(file_path, 'r', encoding='utf-8-sig') as f:
+        content = f.read()
+
+    # 抽出したいキーのリスト
+    keys = ['C', 'm0', 'L1', 'dm1', 'k1', 'x01', 'L2', 'dm2', 'k2', 'x02']
+    params = []
+
+    for k in keys:
+        match = re.search(fr"{k}\s*=\s*([-\d\.eE]+)", content)
+        if match:
+            params.append(float(match.group(1)))
+        else:
+            raise ValueError(f"エラー：パラメータ '{k}' がファイル内に見つかりません。")
+    
+    return params
+
+# 入力ファイルパスを取得
+if len(sys.argv) > 1:
+    csv_file_path = sys.argv[1]
+else:
+    print("エラー：対象のCSVファイルをドラッグ＆ドロップしてください。")
+    exit_with_pause()
+
+input_path = Path(csv_file_path)
+
+# データ出力先
+output_dir = input_path.parent # フォルダ名を取得
+base_name = input_path.stem # 拡張子を除いたファイル名を取得
+
+if input_path.suffix.lower() != '.csv':
+    print(f"エラー：ドロップされたファイル '{input_path.name}' はCSV形式ではありません。")
+    exit_with_pause()
+
+param_filename = 'success_params.txt'
+param_file_path = output_dir / param_filename
+
+if not param_file_path.exists():
+    print(f"エラー：フォルダ '{output_dir}' 内に初期値ファイル '{param_filename}' が見つかりません。")
+    print("成功したパラメータのテキストファイルをこの名前に変更して同じフォルダに配置してください。")
+    exit_with_pause()
+
+print(f"探索完了：固定パラメータファイル '{param_file_path.name}' を初期値として使用します。")
 
 try:
-    df = pd.read_csv(csv_file_path)
-except FileNotFoundError:
-    print(f"エラー: '{csv_file_path}' が見つかりません。")
-    exit()
+    df = pd.read_csv(input_path)
+except Exception as e:
+    print(f"エラー: CSVファイルの読み込みに失敗しました。\n詳細： {e}")
+    exit_with_pause()
 
-df = df.dropna(subset=[x_column_name, y_column_name])
-df = df.sort_values(by=x_column_name)
+if len(df.columns) < 2:
+    print("エラー：CSVファイルには少なくとも2列のデータが必要です。")
+    exit_with_pause()
 
-x_data = df[x_column_name].values
-y_data = df[y_column_name].values
+col_x = df.columns[0]
+col_y = df.columns[1]
+df = df.dropna(subset=[col_x, col_y]).sort_values(by=col_x)
 
-# 3. フィッティングの実行 (手動指定ロジック)
-if len(x_data) < 10:
-    print("エラー: データ数が少なすぎます。")
-    exit()
+x_data = df.iloc[:, 0].values
+y_data = df.iloc[:, 1].values
 
-# ★重要: ここに成功した試行のパラメータを入力してください
-# 順番: C, m0, L1, dm1, k1, x01, L2, dm2, k2, x02
-successful_popt = [
-    5.12, -0.0450,              
-    10.50, 0.0480, 0.35, 41.20, 
-    14.80, 0.0950, 0.52, 61.50  
-]
-
-initial_guess = successful_popt
+# フィッティングの実行（手動指定ロジック）
+# 成功パラメータの読み込み
+try:
+    initial_guess = load_param_from_txt(param_file_path)
+    print(f"※ '{param_file_path}' から初期値を読み込みました。")
+except Exception as e:
+    print(f"パラメータの読み込みに失敗しました：{e}")
+    exit_with_pause()
 
 x_min, x_max = np.min(x_data), np.max(x_data)
 lower_bounds = [-np.inf, -np.inf, 0,      -np.inf, 0.001,   x_min, 0,      -np.inf, 0.001,   x_min]
@@ -55,24 +103,38 @@ try:
         maxfev=10000
     )
 except RuntimeError as e:
-    print(f"最適化に失敗しました。\n詳細: {e}")
-    exit()
+    print(f"最適化に失敗しました。\n詳細：{e}")
+    exit_with_pause()
 
-# 4. 結果の出力とテキストファイル保存
+# 結果の出力とテキストファイル保存
 C_opt, m0_opt, L1_opt, dm1_opt, k1_opt, x01_opt, L2_opt, dm2_opt, k2_opt, x02_opt = popt
 
+# 最適化されたパラメータを使って、Xに対するYの予測値を計算
+y_fit = double_sigmoid_additive(x_data, *popt)
+# 残差平方和と全変動を計算
+ss_res = np.sum((y_data - y_fit) ** 2)
+ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
+# R^2値の算出
+r_squared = 1 - (ss_res / ss_tot)
+
 result_text = (
-    "最適化されたパラメータ (Manual):\n"
-    f"ベースライン: Y切片 C = {C_opt:.2f}, 初期傾き m0 = {m0_opt:.4f}\n"
-    f"プロセス1   : 振幅 L1 = {L1_opt:.2f}, 傾き変化量 dm1 = {dm1_opt:.4f}, 急峻さ k1 = {k1_opt:.4f}, 変曲点 x01 = {x01_opt:.2f}\n"
-    f"プロセス2   : 振幅 L2 = {L2_opt:.2f}, 傾き変化量 dm2 = {dm2_opt:.4f}, 急峻さ k2 = {k2_opt:.4f}, 変曲点 x02 = {x02_opt:.2f}\n"
+    "最適化されたパラメータ (Auto):\n"
+    f"決定係数　　： {r_squared:.4f}\n"
+    f"ベースライン： Y切片 C = {C_opt:.2f}, 初期傾き m0 = {m0_opt:.4f}\n"
+    f"プロセス１　： 振幅 L1 = {L1_opt:.2f}, 傾き変化量 dm1 = {dm1_opt:.4f}, 急峻さ k1 = {k1_opt:.4f}, 変曲点 x01 = {x01_opt:.2f}\n"
+    f"プロセス２　： 振幅 L2 = {L2_opt:.2f}, 傾き変化量 dm2 = {dm2_opt:.4f}, 急峻さ k2 = {k2_opt:.4f}, 変曲点 x02 = {x02_opt:.2f}\n"
 )
 print(result_text)
 
-with open('fit_results_manual.txt', 'w', encoding='utf-8') as f:
-    f.write(result_text)
+# ファイル名の構築
+txt_filename = f"{base_name}_fit_results_manual.txt"
+txt_output_path = output_dir / txt_filename
 
-# 5. 結果のプロットと画像ファイル保存
+with open(txt_output_path, 'w', encoding='utf-8-sig') as f:
+    f.write(result_text)
+print(f"※ パラメータを '{txt_output_path}' に保存しました。")
+
+# 結果のプロットと画像ファイル保存
 plt.figure(figsize=(10, 7))
 plt.scatter(x_data, y_data, label='Observed Data', color='gray', alpha=0.5, s=15)
 plt.plot(x_data, double_sigmoid_additive(x_data, *popt), label='Fitted Model (Manual)', color='red', linewidth=2)
@@ -87,12 +149,15 @@ plt.plot(x_data, base + comp2, '--', color='limegreen', alpha=0.8, label='Proces
 plt.axvline(x=x01_opt, color='dodgerblue', linestyle=':', alpha=0.6)
 plt.axvline(x=x02_opt, color='limegreen', linestyle=':', alpha=0.6)
 
-plt.xlabel(x_column_name)
-plt.ylabel(y_column_name)
+plt.xlabel(col_x)
+plt.ylabel(col_y)
 plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-plt.title('Fitting Double Sigmoid (Manual Guess)')
 plt.grid(True)
 plt.tight_layout()
 
-plt.savefig('fitted_curve_manual.png', dpi=300, bbox_inches='tight')
-plt.show()
+png_filename = f"{base_name}_fitted_curve_auto.png"
+png_output_path = output_dir / png_filename
+plt.savefig(png_output_path, dpi=300, bbox_inches='tight')
+print(f"※ プロット画像を '{png_output_path}' に保存しました。")
+print("\n全ての処理が完了しました。")
+exit_with_pause()

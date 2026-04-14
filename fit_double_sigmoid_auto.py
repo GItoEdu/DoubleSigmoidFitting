@@ -32,16 +32,19 @@ output_dir = input_path.parent # フォルダ名を取得
 base_name = input_path.stem # 拡張子を除いたファイル名を取得
 
 try:
-    df = pd.read_csv(csv_file_path)
-except FileNotFoundError:
-    print(f"エラー: '{csv_file_path}' が見つかりません。")
+    df = pd.read_csv(input_path)
+except Exception as e:
+    print(f"エラー: CSVファイルの読み込みに失敗しました。\n詳細： {e}")
+    exit_with_pause()
+
+if len(df.columns) < 2:
+    print("エラー：CSVファイルには少なくとも2列のデータが必要です。")
     exit_with_pause()
 
 col_x = df.columns[0]
 col_y = df.columns[1]
 
-df = df.dropna(subset=[col_x, col_y])
-df = df.sort_values(by=col_x)
+df = df.dropna(subset=[col_x, col_y]).sort_values(by=col_x)
 
 x_data = df.iloc[:, 0].values
 y_data = df.iloc[:, 1].values
@@ -83,8 +86,17 @@ except RuntimeError as e:
 # 結果の出力とテキストファイル保存
 C_opt, m0_opt, L1_opt, dm1_opt, k1_opt, x01_opt, L2_opt, dm2_opt, k2_opt, x02_opt = popt
 
+# 最適化されたパラメータを使って、Xに対するYの予測値を計算
+y_fit = double_sigmoid_additive(x_data, *popt)
+# 残差平方和と全変動を計算
+ss_res = np.sum((y_data - y_fit) ** 2)
+ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
+# R^2値の算出
+r_squared = 1 - (ss_res / ss_tot)
+
 result_text = (
     "最適化されたパラメータ (Auto):\n"
+    f"決定係数　　： {r_squared:.4f}\n"
     f"ベースライン： Y切片 C = {C_opt:.2f}, 初期傾き m0 = {m0_opt:.4f}\n"
     f"プロセス１　： 振幅 L1 = {L1_opt:.2f}, 傾き変化量 dm1 = {dm1_opt:.4f}, 急峻さ k1 = {k1_opt:.4f}, 変曲点 x01 = {x01_opt:.2f}\n"
     f"プロセス２　： 振幅 L2 = {L2_opt:.2f}, 傾き変化量 dm2 = {dm2_opt:.4f}, 急峻さ k2 = {k2_opt:.4f}, 変曲点 x02 = {x02_opt:.2f}\n"
