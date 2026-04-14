@@ -12,9 +12,9 @@ def double_sigmoid_additive(x, C, m0, L1, dm1, k1, x01, L2, dm2, k2, x02):
 
 # 2. データの読み込み
 # 以下の変数を実際のCSVファイルに合わせて調整してください
-csv_file_path = 'H:\\pH5_2.csv'
+csv_file_path = 'H:\\pH5_1.csv'
 x_column_name = 'Temperature'
-y_column_name = 'pH5_2'
+y_column_name = 'pH5_1'
 
 try:
     df = pd.read_csv(csv_file_path)
@@ -62,13 +62,15 @@ upper_bounds = [ np.inf,  np.inf, np.inf,  np.inf, np.inf,  x_max, np.inf,  np.i
 try:
     successful_popt = [
         16086.68, -293.7046,
-        11721.57, -43.9145, -33.11
+        11721.57, -43.9145, 0.6193, 33.11,
+        32463.22, -330.4160, 0.1258, 50.47
     ]
     popt, pcov = curve_fit(
         double_sigmoid_additive, 
         x_data, y_data, 
-        p0=initial_guess, 
-        bounds=(lower_bounds, upper_bounds)
+        p0=successful_popt, 
+        bounds=(lower_bounds, upper_bounds),
+        maxfev=10000
     )
 except RuntimeError as e:
     print(f"最適化に失敗しました。初期値やBoundsを見直してください。\n詳細: {e}")
