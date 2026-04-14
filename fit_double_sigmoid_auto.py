@@ -2,18 +2,24 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
+from pathlib import Path
 
-# 1. 数理モデルの定義
+# 数理モデルの定義
 def double_sigmoid_additive(x, C, m0, L1, dm1, k1, x01, L2, dm2, k2, x02):
     base = m0 * x + C
     comp1 = (L1 + dm1 * (x - x01)) / (1 + np.exp(-k1 * (x - x01)))
     comp2 = (L2 + dm2 * (x - x02)) / (1 + np.exp(-k2 * (x - x02)))
     return base + comp1 + comp2
 
-# 2. データの読み込み
-csv_file_path = 'data.csv'
-x_column_name = 'X'
-y_column_name = 'Y'
+# データの読み込み
+csv_file_path = 'H:\\pH5_2.csv'
+input_path = Path(csv_file_path)
+x_column_name = 'Temperature'
+y_column_name = 'Fluorescence'
+
+# データ出力先
+output_dir = input_path.parent # フォルダ名を取得
+base_name = input_path.stem # 拡張子を除いたファイル名を取得
 
 try:
     df = pd.read_csv(csv_file_path)
@@ -27,7 +33,7 @@ df = df.sort_values(by=x_column_name)
 x_data = df[x_column_name].values
 y_data = df[y_column_name].values
 
-# 3. フィッティングの実行 (自動推論ロジック)
+# フィッティングの実行 (自動推論ロジック)
 n = len(x_data)
 if n < 10:
     print("エラー: データ数が少なすぎます。")
@@ -61,7 +67,7 @@ except RuntimeError as e:
     print(f"最適化に失敗しました。\n詳細: {e}")
     exit()
 
-# 4. 結果の出力とテキストファイル保存
+# 結果の出力とテキストファイル保存
 C_opt, m0_opt, L1_opt, dm1_opt, k1_opt, x01_opt, L2_opt, dm2_opt, k2_opt, x02_opt = popt
 
 result_text = (
@@ -72,10 +78,15 @@ result_text = (
 )
 print(result_text)
 
+# ファイル名の構築
+txt_filename = f"{base_name}_fit_results_auto.txt"
+txt_output_path = output_dir / txt_filename
+
 with open('fit_results_auto.txt', 'w', encoding='utf-8') as f:
     f.write(result_text)
+print(f"※ パラメータを '{txt_output_path}' に保存しました。")
 
-# 5. 結果のプロットと画像ファイル保存
+# 結果のプロットと画像ファイル保存
 plt.figure(figsize=(10, 7))
 plt.scatter(x_data, y_data, label='Observed Data', color='gray', alpha=0.5, s=15)
 plt.plot(x_data, double_sigmoid_additive(x_data, *popt), label='Fitted Model (Auto)', color='red', linewidth=2)
@@ -97,5 +108,8 @@ plt.title('Fitting Double Sigmoid (Auto Guess)')
 plt.grid(True)
 plt.tight_layout()
 
-plt.savefig('fitted_curve_auto.png', dpi=300, bbox_inches='tight')
+png_filename = f"{base_name}_fitted_curve_auto.png"
+png_output_path = output_dir / png_filename
+plt.savefig(png_output_path, dpi=300, bbox_inches='tight')
+print(f"※ プロット画像を '{png_output_path}' に保存しました。")
 plt.show()
