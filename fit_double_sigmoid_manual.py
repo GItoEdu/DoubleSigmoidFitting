@@ -1,0 +1,98 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+
+# 1. 数理モデルの定義
+def double_sigmoid_additive(x, C, m0, L1, dm1, k1, x01, L2, dm2, k2, x02):
+    base = m0 * x + C
+    comp1 = (L1 + dm1 * (x - x01)) / (1 + np.exp(-k1 * (x - x01)))
+    comp2 = (L2 + dm2 * (x - x02)) / (1 + np.exp(-k2 * (x - x02)))
+    return base + comp1 + comp2
+
+# 2. データの読み込み
+csv_file_path = 'data.csv'
+x_column_name = 'X'
+y_column_name = 'Y'
+
+try:
+    df = pd.read_csv(csv_file_path)
+except FileNotFoundError:
+    print(f"エラー: '{csv_file_path}' が見つかりません。")
+    exit()
+
+df = df.dropna(subset=[x_column_name, y_column_name])
+df = df.sort_values(by=x_column_name)
+
+x_data = df[x_column_name].values
+y_data = df[y_column_name].values
+
+# 3. フィッティングの実行 (手動指定ロジック)
+if len(x_data) < 10:
+    print("エラー: データ数が少なすぎます。")
+    exit()
+
+# ★重要: ここに成功した試行のパラメータを入力してください
+# 順番: C, m0, L1, dm1, k1, x01, L2, dm2, k2, x02
+successful_popt = [
+    5.12, -0.0450,              
+    10.50, 0.0480, 0.35, 41.20, 
+    14.80, 0.0950, 0.52, 61.50  
+]
+
+initial_guess = successful_popt
+
+x_min, x_max = np.min(x_data), np.max(x_data)
+lower_bounds = [-np.inf, -np.inf, 0,      -np.inf, 0.001,   x_min, 0,      -np.inf, 0.001,   x_min]
+upper_bounds = [ np.inf,  np.inf, np.inf,  np.inf, np.inf,  x_max, np.inf,  np.inf, np.inf,  x_max]
+
+try:
+    popt, pcov = curve_fit(
+        double_sigmoid_additive, 
+        x_data, y_data, 
+        p0=initial_guess, 
+        bounds=(lower_bounds, upper_bounds),
+        maxfev=10000
+    )
+except RuntimeError as e:
+    print(f"最適化に失敗しました。\n詳細: {e}")
+    exit()
+
+# 4. 結果の出力とテキストファイル保存
+C_opt, m0_opt, L1_opt, dm1_opt, k1_opt, x01_opt, L2_opt, dm2_opt, k2_opt, x02_opt = popt
+
+result_text = (
+    "最適化されたパラメータ (Manual):\n"
+    f"ベースライン: Y切片 C = {C_opt:.2f}, 初期傾き m0 = {m0_opt:.4f}\n"
+    f"プロセス1   : 振幅 L1 = {L1_opt:.2f}, 傾き変化量 dm1 = {dm1_opt:.4f}, 急峻さ k1 = {k1_opt:.4f}, 変曲点 x01 = {x01_opt:.2f}\n"
+    f"プロセス2   : 振幅 L2 = {L2_opt:.2f}, 傾き変化量 dm2 = {dm2_opt:.4f}, 急峻さ k2 = {k2_opt:.4f}, 変曲点 x02 = {x02_opt:.2f}\n"
+)
+print(result_text)
+
+with open('fit_results_manual.txt', 'w', encoding='utf-8') as f:
+    f.write(result_text)
+
+# 5. 結果のプロットと画像ファイル保存
+plt.figure(figsize=(10, 7))
+plt.scatter(x_data, y_data, label='Observed Data', color='gray', alpha=0.5, s=15)
+plt.plot(x_data, double_sigmoid_additive(x_data, *popt), label='Fitted Model (Manual)', color='red', linewidth=2)
+
+base = m0_opt * x_data + C_opt
+comp1 = (L1_opt + dm1_opt * (x_data - x01_opt)) / (1 + np.exp(-k1_opt * (x_data - x01_opt)))
+comp2 = (L2_opt + dm2_opt * (x_data - x02_opt)) / (1 + np.exp(-k2_opt * (x_data - x02_opt)))
+
+plt.plot(x_data, base, ':', color='black', label='Baseline')
+plt.plot(x_data, base + comp1, '--', color='dodgerblue', alpha=0.8, label='Process 1')
+plt.plot(x_data, base + comp2, '--', color='limegreen', alpha=0.8, label='Process 2')
+plt.axvline(x=x01_opt, color='dodgerblue', linestyle=':', alpha=0.6)
+plt.axvline(x=x02_opt, color='limegreen', linestyle=':', alpha=0.6)
+
+plt.xlabel(x_column_name)
+plt.ylabel(y_column_name)
+plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+plt.title('Fitting Double Sigmoid (Manual Guess)')
+plt.grid(True)
+plt.tight_layout()
+
+plt.savefig('fitted_curve_manual.png', dpi=300, bbox_inches='tight')
+plt.show()
