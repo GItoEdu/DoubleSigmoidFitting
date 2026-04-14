@@ -3,6 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 from pathlib import Path
+import japanize_matplotlib
+plt.rcParams['font.family'] = "Gen Jyuu Gothic LP"
 
 # 数理モデルの定義
 def double_sigmoid_additive(x, C, m0, L1, dm1, k1, x01, L2, dm2, k2, x02):
@@ -14,8 +16,6 @@ def double_sigmoid_additive(x, C, m0, L1, dm1, k1, x01, L2, dm2, k2, x02):
 # データの読み込み
 csv_file_path = 'H:\\pH5_2.csv'
 input_path = Path(csv_file_path)
-x_column_name = 'Temperature'
-y_column_name = 'Fluorescence'
 
 # データ出力先
 output_dir = input_path.parent # フォルダ名を取得
@@ -27,11 +27,14 @@ except FileNotFoundError:
     print(f"エラー: '{csv_file_path}' が見つかりません。")
     exit()
 
-df = df.dropna(subset=[x_column_name, y_column_name])
-df = df.sort_values(by=x_column_name)
+col_x = df.columns[0]
+col_y = df.columns[1]
 
-x_data = df[x_column_name].values
-y_data = df[y_column_name].values
+df = df.dropna(subset=[col_x, col_y])
+df = df.sort_values(by=col_x)
+
+x_data = df.iloc[:, 0].values
+y_data = df.iloc[:, 1].values
 
 # フィッティングの実行 (自動推論ロジック)
 n = len(x_data)
@@ -101,8 +104,8 @@ plt.plot(x_data, base + comp2, '--', color='limegreen', alpha=0.8, label='Proces
 plt.axvline(x=x01_opt, color='dodgerblue', linestyle=':', alpha=0.6)
 plt.axvline(x=x02_opt, color='limegreen', linestyle=':', alpha=0.6)
 
-plt.xlabel(x_column_name)
-plt.ylabel(y_column_name)
+plt.xlabel(col_x)
+plt.ylabel(col_y)
 plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
 plt.title('Fitting Double Sigmoid (Auto Guess)')
 plt.grid(True)
