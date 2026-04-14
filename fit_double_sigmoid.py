@@ -12,9 +12,9 @@ def double_sigmoid_additive(x, C, m0, L1, dm1, k1, x01, L2, dm2, k2, x02):
 
 # 2. データの読み込み
 # 以下の変数を実際のCSVファイルに合わせて調整してください
-csv_file_path = 'data.csv'
-x_column_name = 'X'
-y_column_name = 'Y'
+csv_file_path = 'H:\\pH5_2.csv'
+x_column_name = 'Temperature'
+y_column_name = 'pH5_2'
 
 try:
     df = pd.read_csv(csv_file_path)
@@ -60,6 +60,10 @@ lower_bounds = [-np.inf, -np.inf, 0,      -np.inf, 0.001,   x_min, 0,      -np.i
 upper_bounds = [ np.inf,  np.inf, np.inf,  np.inf, np.inf,  x_max, np.inf,  np.inf, np.inf,  x_max]
 
 try:
+    successful_popt = [
+        16086.68, -293.7046,
+        11721.57, -43.9145, -33.11
+    ]
     popt, pcov = curve_fit(
         double_sigmoid_additive, 
         x_data, y_data, 
@@ -75,8 +79,8 @@ C_opt, m0_opt, L1_opt, dm1_opt, k1_opt, x01_opt, L2_opt, dm2_opt, k2_opt, x02_op
 
 print("最適化されたパラメータ:")
 print(f"ベースライン: Y切片 C = {C_opt:.2f}, 初期傾き m0 = {m0_opt:.4f}")
-print(f"プロセス1   : 振幅 L1 = {L1_opt:.2f}, 傾き変化量 dm1 = {dm1_opt:.4f}, 変曲点 x01 = {x01_opt:.2f}")
-print(f"プロセス2   : 振幅 L2 = {L2_opt:.2f}, 傾き変化量 dm2 = {dm2_opt:.4f}, 変曲点 x02 = {x02_opt:.2f}")
+print(f"プロセス1   : 振幅 L1 = {L1_opt:.2f}, 傾き変化量 dm1 = {dm1_opt:.4f}, 急峻さ k1 = {k1_opt:.4f}, 変曲点 x01 = {x01_opt:.2f}")
+print(f"プロセス2   : 振幅 L2 = {L2_opt:.2f}, 傾き変化量 dm2 = {dm2_opt:.4f}, 急峻さ k2 = {k2_opt:.4f}, 変曲点 x02 = {x02_opt:.2f}")
 
 # 5. 結果のプロット
 plt.figure(figsize=(10, 7))
